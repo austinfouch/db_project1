@@ -1,3 +1,10 @@
+import psycopg2
+from urllib.parse import urlparse, uses_netloc
+import configparser
+
+config = configparser.ConfigParser()
+config.read('config.ini')
+connection_string = config['database']['postgres_connection']
 ################################################################################
 #  REMOVE THESE LISTS, THEY ARE HERE AS MOCK DATA ONLY.
 customers = list()
@@ -47,49 +54,96 @@ def _delete_by_id(things, id):
 # The following functions are REQUIRED - you should REPLACE their implementation
 # with the appropriate code to interact with your PostgreSQL database.
 def initialize():
-    # this function will get called once, when the application starts.
-    # this would be a good place to initalize your connection!
-    print('Nothing to do here...')
+    createCustomers = "CREATE TABLE IF NOT EXISTS Customers(customerId SERIAL PRIMARY KEY, firstName VARCHAR(100), lastName VARCHAR(100), street VARCHAR(100), city VARCHAR(100), state VARCHAR(2), zip REAL);"
+    createProducts = "CREATE TABLE IF NOT EXISTS Products(productId SERIAL PRIMARY KEY, name VARCHAR(100), price REAL);"
+    createOrders = "CREATE TABLE IF NOT EXISTS Orders(orderId SERIAL PRIMARY KEY, FOREIGN KEY(customerId) REFERENCES Customers(customerId), FOREIGN KEY(productId) REFERENCES Products(productId), date DATE);"
+    with conn.cursor() as cursor:
+        cursor.execute(createCustomers)
+        cursor.execute(createProducts)
+        cursor.execute(createOrders)
+    conn.commit()
 
 def get_customers():
-    return customers
+    getCustomers = "SELECT Customers.customerId, Customers.firstName, Customers.lastName, Customers.street, Customers.city, Customers.state, Customers.zip FROM Customers;"
+    with conn.cursor() as cursor:
+        cursor.execute(getCustomers)
+        customers = cursor.fetchall()
+        for a_customer in customers:
+            yield a_customer
+    conn.commit()
 
 def get_customer(id):
-    return _find_by_id(customers, id)
+    getCustomer = "SELECT Customers.customerId, Customers.firstName, Customers.lastName, Customers.street, Customers.city, Customers.state, Customers.zip FROM Customers WHERE id='{0}'".format(id)
+    with conn.cursor() as cursor:
+        cursor.execute(getCustomer)
+        customer = cursor.fetchone()
+    conn.commit()
+    return customer
 
+## TODO ##
 def upsert_customer(customer):
     _upsert_by_id(customers, customer)
 
 def delete_customer(id):
-    _delete_by_id(customers, id)
+    deleteCustomer = "DELETE FROM Customers WHERE Class='{0}'".format(id)
+    with conn.cursor() as cursor:
+        cursor.execute(deleteCustomer)
+    conn.commit()
     
 def get_products():
-    return products
+    getProducts = "SELECT Product.productId, Product.name, Product.price FROM Products;"
+    with conn.cursor() as cursor:
+        cursor.execute(getProducts)
+        products = cursor.fetchall()
+        for a_product in products:
+            yield a_product
+    conn.commit()
 
 def get_product(id):
-    return _find_by_id(products, id)
+    getProduct = "SELECT Product.productId, Product.name, Product.price FROM Products WHERE id='{0}'".format(id)
+    with conn.cursor() as cursor:
+        cursor.execute(getProduct)
+        product = cursor.fetchone()
+    conn.commit()
+    return product
 
+## TODO ##
 def upsert_product(product):
     _upsert_by_id(products, product)
 
 def delete_product(id):
-    _delete_by_id(products, id)
+    deleteProduct = "DELETE FROM Product WHERE Class='{0}'".format(id)
+    with conn.cursor() as cursor:
+        cursor.execute(deleteProduct)
+    conn.commit()
 
+## TODO ##
 def get_orders():
+    getOrders = "SELECT Orders.orderId, Orders.customerId. Orders.productId, Orders.date FROM Orders;"
+    with conn.cursor() as cursor:
+        cursor.execute(getOrders)
+        orders = cursor.fetchall()
+        for a_order in orders:
+            yield a_order
+    conn.commit()
     for order in orders:
         order['product'] = _find_by_id(products, order['productId'])
         order['customer'] = _find_by_id(customers, order['customerId'])
     return orders
 
+## TODO ##
 def get_order(id):
     return _find_by_id(orders, id)
 
+## TODO ##
 def upsert_order(order):
     _upsert_by_id(orders, order)
 
+## TODO ##
 def delete_order(id):
     _delete_by_id(orders, id)
 
+## TODO ##
 # Return the customer, with a list of orders.  Each order should have a product 
 # property as well.
 def customer_report(id):
@@ -98,6 +152,7 @@ def customer_report(id):
     customer['orders'] = [o for o in orders if o['customerId'] == id]
     return customer
 
+## TODO ##
 def sales_report():
     products = get_products()
     for product in products:
@@ -107,3 +162,21 @@ def sales_report():
         product['total_sales'] = len(orders)
         product['gross_revenue'] = product['price'] * product['total_sales']
     return products
+
+# This is called at the bottom of this file.  You can re-use this important function in any python program
+# that uses psychopg2.  The connection string parameter comes from the config.ini file in this
+# particular example.  You do not need to edit this code.
+def connect_to_db(conn_str):
+    uses_netloc.append("postgres")
+    url = urlparse(conn_str)
+
+    conn = psycopg2.connect(database=url.path[1:],
+        user=url.username,
+        password=url.password,
+        host=url.hostname,
+        port=url.port)
+
+    return conn
+
+conn = connect_to_db(connection_string)
+initialize()

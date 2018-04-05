@@ -1,0 +1,36 @@
+customers.append({'id': 0, 'firstName': "Kasandra", 'lastName': "Cryer", 'street':"884 Meadow Lane", 'city':"Bardstown", 'state':"KY", 'zip':  "4004"})
+
+products.append({'id':0, 'name': "Product A", 'price': 5})
+
+orders.append({'id':0, 'customerId': 0, 'productId':0, 'date':"2017-04-12"})
+
+
+"CREATE TABLE IF NOT EXISTS Customers(
+	id SERIAL PRIMARY KEY, 
+	firstName VARCHAR(100), 
+	lastName VARCHAR(100), 
+	street VARCHAR(100), 
+	city VARCHAR(100),
+	state VARCHAR(2), 
+	zip REAL
+);"
+
+"CREATE TABLE IF NOT EXISTS Products(
+	id SERIAL PRIMARY KEY, 
+	name VARCHAR(100), 
+	price REAL
+);"
+
+
+"CREATE TABLE IF NOT EXISTS Orders(
+	id SERIAL PRIMARY KEY, 
+	FOREIGN KEY(customerId) REFERENCES Customers(id), 
+	FOREIGN KEY(productId) REFERENCES Products(id),
+	date DATE
+);"
+
+"SELECT Customers.id, Customers.firstName, Customers.lastName, Customers.street, Customers.city, Customers.state, Customers.zip FROM Classes;"
+
+"SELECT Product.id, Product.name, Product.price FROM Products;"
+
+"SELECT Orders.id, Orders.customerId. Orders.productId, Orders.date FROM Orders;"

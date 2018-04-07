@@ -105,6 +105,7 @@ def order_new():
         return render_template('orders/new.html', customers=get_customers(), products=get_products())
     else:
         n = request.form.copy()
+        print(n)
         n['customerId'] = int(n['customerId'])
         n['productId'] = int(n['productId'])
         n['date'] = n['year'] + '-' + n['month'] + '-' + n['day']

@@ -45,13 +45,15 @@ def get_customer(id):
 
 ## TODO ##
 def upsert_customer(customer):
-    if 'id' in customer.keys():
-        print("edit customer...")
-    else:
-        customerData = list(customer.values())
-        with conn.cursor() as cursor:
+    customerData = list(customer.values())
+    with conn.cursor() as cursor:
+        if 'id' in customer.keys():
+            customerData.append(customerData[0])
+            customerData.pop(0)
+            cursor.execute("""UPDATE Customers SET firstName=%s, lastName=%s, street=%s, city=%s, state=%s, zip=%s WHERE Customers.id=%s;""", customerData)
+        else:
             cursor.execute("""INSERT INTO Customers (firstName, lastName, street, city, state, zip) VALUES(%s, %s, %s, %s, %s, %s);""", customerData)
-        conn.commit()
+    conn.commit()
 
 def delete_customer(id):
     with conn.cursor() as cursor:
@@ -85,7 +87,9 @@ def upsert_product(product):
     productData = list(product.values())
     with conn.cursor() as cursor:
         if 'id' in product.keys():
-            cursor.execute("""UPDATE Products SET Products.name=%s, Products.price=%s WHERE Products.id=%s""", productData)
+            productData.append(productData[0])
+            productData.pop(0)
+            cursor.execute("""UPDATE Products SET name=%s, price=%s WHERE Products.id=%s;""", productData)
         else:
             cursor.execute("""INSERT INTO Products (name, price) VALUES(%s, %s);""", productData)
     conn.commit()
@@ -103,51 +107,86 @@ def get_orders():
         cursor.execute(getOrders)
         orders = cursor.fetchall()
         for a_order in orders:
-            print(a_order)
+            customer = {}
+            customerList = get_customer(a_order[1])
+            customer["firstName"] = customerList[1]
+            customer["lastName"] = customerList[2]
+
+            product = {}
+            productList = get_product(a_order[2])
+            product["name"] = productList[1]
+
             order = {}
-            customer = get_customer(a_order[1])
-            product = get_product(a_order[2])
-            print(customer)
-            print(product)
             order["id"] = a_order[0]
-            order["customer"] = get_customer(a_order[1])
-            order["product"] = get_product(a_order[2])
+            order["customer"] = customer
+            order["product"] = product
             order["date"] = a_order[3]
-            yield a_order
+
+            yield order
     conn.commit()
 
 ## TODO ##
-#def get_order(id):
-#    return _find_by_id(orders, id)
+def get_order(id):
+    getOrder = "SELECT Orders.id, Orders.customerId, Orders.productId, Orders.date FROM Orders WHERE id='{0}'".format(id)
+    dict_cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    with dict_cur as cursor:
+        cursor.execute(getOrder)
+        order = cursor.fetchone()
+    conn.commit()
+    return order
 
 ## TODO ##
 def upsert_order(order):
     orderData = list(order.values())
-    print(orderData)
     with conn.cursor() as cursor:
         if 'id' in order.keys():
             print("edit product...")
         else:
-            cursor.execute("""INSERT INTO Orders (customerId, productId, date) VALUES(%s, %s, %s);""", (orderData[1], orderData[2], orderData[5]))
+            cursor.execute("""INSERT INTO Orders (customerId, productId, date) VALUES(%s, %s, %s);""", (orderData[0], orderData[1], orderData[5]))
     conn.commit()
 
 ## TODO ##
-#def delete_order(id):
-#    _delete_by_id(orders, id)
+def delete_order(id):
+    deleteOrder = "DELETE FROM Orders WHERE Orders.id='{0}'".format(id)
+    with conn.cursor() as cursor:
+        cursor.execute(deleteOrder)
+    conn.commit()
 
 ## TODO ##
 # Return the customer, with a list of orders.  Each order should have a product 
 # property as well.
 def customer_report(id):
-    customer = {} #_find_by_id(customers, id)
-    orders = get_orders()
-    customer['orders'] = [o for o in orders if o['customerId'] == id]
+    getOrders = "SELECT Orders.id, Orders.customerId, Orders.productId, Orders.date FROM Orders WHERE customerId='{0}'".format(id)
+    with conn.cursor() as cursor:
+        customer = {}
+        customerList = get_customer(id)
+        customer["firstName"] = customerList[1]
+        customer["lastName"] = customerList[2]
+        customer["orders"] = []
+        
+        cursor.execute(getOrders)
+        orders = cursor.fetchall()
+        for a_order in orders:
+            productList = get_product(a_order[2])
+            product = {}
+            product["name"] = productList[1]
+  
+            order = {}
+            order["id"] = a_order[0]
+            order["product"] = product
+            order["date"] = a_order[3]
+
+            customer["orders"].append(order)
+    conn.commit()
     return customer
 
 ## TODO ##
 def sales_report():
     products = get_products()
     for product in products:
+        print(product)
+        for o in get_orders():
+            print(o)
         orders = [o for o in get_orders() if o['productId'] == product['id']] 
         orders = sorted(orders, key=lambda k: k['date']) 
         product['last_order_date'] = orders[-1]['date']

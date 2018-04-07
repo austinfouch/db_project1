@@ -1,3 +1,8 @@
+# Author:   Austin Fouch
+# Project:  CMPS364 Project 1
+# Date:     04/05/2018
+# Note: HTML templates using this file MUST have fields in lowercase ONLY -- NO camelCase.
+
 import psycopg2, psycopg2.extras
 from urllib.parse import urlparse, uses_netloc
 import configparser
@@ -6,10 +11,8 @@ config = configparser.ConfigParser()
 config.read('config.ini')
 connection_string = config['database']['postgres_connection']
 
-# The following functions are REQUIRED - you should REPLACE their implementation
-# with the appropriate code to interact with your PostgreSQL database.
 def initialize():
-    createCustomers = "CREATE TABLE IF NOT EXISTS Customers(id SERIAL PRIMARY KEY, firstName VARCHAR(100), lastName VARCHAR(100), street VARCHAR(100), city VARCHAR(100), state VARCHAR(2), zip INT);"
+    createCustomers = "CREATE TABLE IF NOT EXISTS Customers(id SERIAL PRIMARY KEY, firstName VARCHAR(100), lastName VARCHAR(100), street VARCHAR(100), city VARCHAR(100), state VARCHAR(2), zip VARCHAR(5));"
     createProducts = "CREATE TABLE IF NOT EXISTS Products(id SERIAL PRIMARY KEY, name VARCHAR(100), price REAL);"
     createOrders = "CREATE TABLE IF NOT EXISTS Orders(id SERIAL PRIMARY KEY, customerId INT, productId INT, FOREIGN KEY(customerId) REFERENCES Customers(id) ON DELETE CASCADE, FOREIGN KEY(productId) REFERENCES Products(id) ON DELETE CASCADE, date DATE);"
     with conn.cursor() as cursor:
@@ -19,35 +22,26 @@ def initialize():
     conn.commit()
 
 def get_customers():
-    getCustomers = "SELECT Customers.id, Customers.firstName, Customers.lastName, Customers.street, Customers.city, Customers.state, Customers.zip FROM Customers;"
-    with conn.cursor() as cursor:
-        cursor.execute(getCustomers)
-        customers = cursor.fetchall()
-        for a_customer in customers:
-            customer = {}
-            customer["id"] = a_customer[0]
-            customer["firstName"] = a_customer[1]
-            customer["lastName"] = a_customer[2]
-            customer["street"] = a_customer[3]
-            customer["city"] = a_customer[4]
-            customer["state"] = a_customer[5]
-            customer["zip"]= a_customer[6]
+    dict_cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    with dict_cur as cursor:
+        cursor.execute("SELECT * FROM Customers;")
+        for customer in cursor:
             yield customer
     conn.commit()
 
 def get_customer(id):
-    dict_cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    dict_cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     with dict_cur as cursor:
-        cursor.execute("""SELECT Customers.id, Customers.firstName, Customers.lastName, Customers.street, Customers.city, Customers.state, Customers.zip FROM Customers WHERE Customers.id=%s;""", [id])
+        cursor.execute("""SELECT * FROM Customers WHERE Customers.id=%s;""", [id])
         customer = cursor.fetchone()
     conn.commit()
     return customer
 
-## TODO ##
 def upsert_customer(customer):
     customerData = list(customer.values())
     with conn.cursor() as cursor:
         if 'id' in customer.keys():
+            # place id at the end of list so it is paramatized last
             customerData.append(customerData[0])
             customerData.pop(0)
             cursor.execute("""UPDATE Customers SET firstName=%s, lastName=%s, street=%s, city=%s, state=%s, zip=%s WHERE Customers.id=%s;""", customerData)
@@ -61,32 +55,26 @@ def delete_customer(id):
     conn.commit()
     
 def get_products():
-    getProducts = "SELECT Products.id, Products.name, Products.price FROM Products;"
-    with conn.cursor() as cursor:
-        cursor.execute(getProducts)
-        products = cursor.fetchall()
-        for a_product in products:
-            product = {}
-            product["id"] = a_product[0]
-            product["name"] = a_product[1]
-            product["price"] = a_product[2]
+    dict_cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    with dict_cur as cursor:
+        cursor.execute("SELECT * FROM Products;")
+        for product in cursor:
             yield product
     conn.commit()
 
 def get_product(id):
-    getProduct = "SELECT Products.id, Products.name, Products.price FROM Products WHERE id='{0}'".format(id)
-    dict_cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    dict_cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     with dict_cur as cursor:
-        cursor.execute(getProduct)
+        cursor.execute("""SELECT * FROM Products WHERE id=%s;""", [id])
         product = cursor.fetchone()
     conn.commit()
     return product
 
-## TODO ##
 def upsert_product(product):
     productData = list(product.values())
     with conn.cursor() as cursor:
         if 'id' in product.keys():
+            # place id at the end of list so it is paramatized last
             productData.append(productData[0])
             productData.pop(0)
             cursor.execute("""UPDATE Products SET name=%s, price=%s WHERE Products.id=%s;""", productData)
@@ -95,108 +83,69 @@ def upsert_product(product):
     conn.commit()
 
 def delete_product(id):
-    deleteProduct = "DELETE FROM Products WHERE Products.id='{0}'".format(id)
     with conn.cursor() as cursor:
-        cursor.execute(deleteProduct)
+        cursor.execute("""DELETE FROM Products WHERE Products.id=%s;""", [id])
     conn.commit()
 
-## TODO ##
 def get_orders():
-    getOrders = "SELECT Orders.id, Orders.customerId, Orders.productId, Orders.date FROM Orders LEFT JOIN Customers ON Orders.customerId = Customers.id LEFT JOIN Products ON Orders.productId = Products.id;"
-    with conn.cursor() as cursor:
+    getOrders = "SELECT * FROM Orders;"
+    dict_cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    with dict_cur as cursor:
         cursor.execute(getOrders)
-        orders = cursor.fetchall()
-        for a_order in orders:
-            customer = {}
-            customerList = get_customer(a_order[1])
-            customer["firstName"] = customerList[1]
-            customer["lastName"] = customerList[2]
-
-            product = {}
-            productList = get_product(a_order[2])
-            product["name"] = productList[1]
-
-            order = {}
-            order["id"] = a_order[0]
-            order["customer"] = customer
-            order["product"] = product
-            order["date"] = a_order[3]
-
+        for order in cursor:
+            order['customer'] = get_customer(order['customerid'])
+            order['product'] = get_product(order['productid'])
             yield order
     conn.commit()
 
-## TODO ##
 def get_order(id):
-    getOrder = "SELECT Orders.id, Orders.customerId, Orders.productId, Orders.date FROM Orders WHERE id='{0}'".format(id)
-    dict_cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    dict_cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     with dict_cur as cursor:
-        cursor.execute(getOrder)
+        cursor.execute("""SELECT * FROM Orders WHERE Order.id=%s;""", [id])
         order = cursor.fetchone()
     conn.commit()
     return order
 
-## TODO ##
 def upsert_order(order):
     orderData = list(order.values())
     with conn.cursor() as cursor:
         if 'id' in order.keys():
-            print("edit product...")
+            # place id at the end of list so it is paramatized last
+            orderData.append(orderData[0])
+            orderData.pop(0)
+            cursor.execute("""UPDATE Orders SET customerId=%s, productId=%s, date=%s WHERE Orders.id=%s;""", orderData)
         else:
             cursor.execute("""INSERT INTO Orders (customerId, productId, date) VALUES(%s, %s, %s);""", (orderData[0], orderData[1], orderData[5]))
     conn.commit()
 
-## TODO ##
 def delete_order(id):
-    deleteOrder = "DELETE FROM Orders WHERE Orders.id='{0}'".format(id)
+    deleteOrder = "DELETE FROM Orders WHERE Orders.id=%s;""", [id]
     with conn.cursor() as cursor:
         cursor.execute(deleteOrder)
     conn.commit()
 
-## TODO ##
-# Return the customer, with a list of orders.  Each order should have a product 
-# property as well.
 def customer_report(id):
-    getOrders = "SELECT Orders.id, Orders.customerId, Orders.productId, Orders.date FROM Orders WHERE customerId='{0}'".format(id)
-    with conn.cursor() as cursor:
-        customer = {}
-        customerList = get_customer(id)
-        customer["firstName"] = customerList[1]
-        customer["lastName"] = customerList[2]
-        customer["orders"] = []
-        
-        cursor.execute(getOrders)
-        orders = cursor.fetchall()
-        for a_order in orders:
-            productList = get_product(a_order[2])
-            product = {}
-            product["name"] = productList[1]
-  
-            order = {}
-            order["id"] = a_order[0]
-            order["product"] = product
-            order["date"] = a_order[3]
-
-            customer["orders"].append(order)
+    dict_cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    with dict_cur as cursor:
+        customer = get_customer(id)
+        customer['orders'] = []
+        cursor.execute("""SELECT * FROM Orders WHERE customerId=%s;""", [id])
+        for order in cursor:
+            order['product'] = get_product(order['productid'])
+            customer['orders'].append(order)
     conn.commit()
     return customer
 
-## TODO ##
 def sales_report():
     products = get_products()
     for product in products:
-        print(product)
-        for o in get_orders():
-            print(o)
-        orders = [o for o in get_orders() if o['productId'] == product['id']] 
+        orders = [o for o in get_orders() if o['productid'] == product['id']] 
         orders = sorted(orders, key=lambda k: k['date']) 
         product['last_order_date'] = orders[-1]['date']
         product['total_sales'] = len(orders)
         product['gross_revenue'] = product['price'] * product['total_sales']
-    return products
+        yield product
 
-# This is called at the bottom of this file.  You can re-use this important function in any python program
-# that uses psychopg2.  The connection string parameter comes from the config.ini file in this
-# particular example.  You do not need to edit this code.
 def connect_to_db(conn_str):
     uses_netloc.append("postgres")
     url = urlparse(conn_str)
